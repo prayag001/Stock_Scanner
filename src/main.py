@@ -223,7 +223,7 @@ def main():
                 time.sleep(60)
                 continue
             
-            if now.time() < trading_start or now.time() > trading_end:
+            if now.time() < trading_start or (now.time().hour == 15 and now.time().minute > 15) or now.time().hour > 15:
                 next_start = next_trading_start(now)
                 sleep_seconds = (next_start - now).total_seconds()
                 print(f"Outside trading window ({now.time()}). Sleeping until {next_start.time()} ({int(sleep_seconds)}s)...")
