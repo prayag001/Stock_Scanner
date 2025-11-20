@@ -12,6 +12,7 @@ seen_stocks*.json
 test_*.py
 chartink_login_page.html
 scan_page.html
+complete_scan_page.html
 
 # Python
 __pycache__/

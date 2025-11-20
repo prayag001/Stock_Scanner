@@ -205,23 +205,7 @@ def main():
                 time.sleep(sleep_seconds)
                 continue
             
-            # Daily reset: Clear all seen stocks at 15:30 once per day
-            if (now.time().hour == 15 and now.time().minute == 30 and 
-                now.date() != last_reset_date):
-                print(f"\n{'='*60}")
-                print(f"DAILY RESET @ {now.time().strftime('%H:%M:%S')} - Clearing all seen stocks")
-                print(f"{'='*60}")
-                for scan_name in seen_stocks.keys():
-                    seen_stocks[scan_name] = set()
-                    scan_key = scan_name.replace(" ", "_").lower()
-                    save_seen(set(), Path(f"seen_stocks_{scan_key}.json"))
-                    print(f"  ✓ Cleared: {scan_name}")
-                print("Daily reset complete. All scans will treat stocks as new tomorrow.")
-                print(f"{'='*60}\n")
-                last_reset_date = now.date()
-                # Sleep past 15:30 to avoid re-triggering
-                time.sleep(60)
-                continue
+            # Daily reset check moved below - happens AFTER last scan at 15:15
             
             if now.time() < trading_start or (now.time().hour == 15 and now.time().minute > 15) or now.time().hour > 15:
                 next_start = next_trading_start(now)
@@ -278,7 +262,20 @@ def main():
             # Determine next slot sleep
             nxt = next_slot(datetime.datetime.now(tz))
             if nxt.time() > trading_end:
-                # Will sleep until next trading day start in next loop iteration
+                # End of trading day - perform daily reset
+                current_date = datetime.datetime.now(tz).date()
+                if current_date != last_reset_date:
+                    print(f"\n{'='*60}")
+                    print(f"DAILY RESET @ {datetime.datetime.now(tz).time().strftime('%H:%M:%S')} - Clearing all seen stocks")
+                    print(f"{'='*60}")
+                    for scan_name in seen_stocks.keys():
+                        seen_stocks[scan_name] = set()
+                        scan_key = scan_name.replace(" ", "_").lower()
+                        save_seen(set(), Path(f"seen_stocks_{scan_key}.json"))
+                        print(f"  ✓ Cleared: {scan_name}")
+                    print("Daily reset complete. All scans will treat stocks as new tomorrow.")
+                    print(f"{'='*60}\n")
+                    last_reset_date = current_date
                 print("End of trading day reached. Preparing for next day.")
             else:
                 sleep_seconds = (nxt - datetime.datetime.now(tz)).total_seconds()
