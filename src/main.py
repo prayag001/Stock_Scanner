@@ -2,6 +2,7 @@
 
 Runs the scan every 15 minutes between 09:15 and 15:15 India time.
 Sends immediate Discord notifications for new stocks (or all if ALWAYS_NOTIFY=true).
+Daily reset at 15:30 clears all seen stocks for fresh start next day.
 """
 import os
 import time
@@ -73,6 +74,7 @@ def main():
     tz = ZoneInfo("Asia/Kolkata")
     trading_start = datetime.time(9, 15)
     trading_end = datetime.time(15, 15)  # inclusive
+    daily_reset_time = datetime.time(15, 30)  # Clear seen stocks at 15:30
 
     def next_trading_start(after: datetime.datetime) -> datetime.datetime:
         """Return next trading day start datetime in tz after given datetime."""
@@ -143,6 +145,9 @@ def main():
                 seen_stocks[scan["name"]] = set()
         print(f"Loaded seen stocks: {', '.join([f'{name}={len(s)}' for name, s in seen_stocks.items()])}")
 
+        # Track if reset was done today
+        last_reset_date = None
+
         # Simulation mode: run compressed multiple scans immediately regardless of market hours.
         if simulate:
             print(f"SIMULATION MODE ENABLED: performing {simulation_runs} scan(s) every {simulation_interval_seconds}s (market hour restrictions bypassed).")
@@ -182,6 +187,25 @@ def main():
 
         while True:
             now = datetime.datetime.now(tz)
+            
+            # Daily reset: Clear all seen stocks at 15:30 once per day
+            if (now.time().hour == 15 and now.time().minute == 30 and 
+                now.date() != last_reset_date):
+                print(f"\n{'='*60}")
+                print(f"DAILY RESET @ {now.time().strftime('%H:%M:%S')} - Clearing all seen stocks")
+                print(f"{'='*60}")
+                for scan_name in seen_stocks.keys():
+                    seen_stocks[scan_name] = set()
+                    scan_key = scan_name.replace(" ", "_").lower()
+                    save_seen(set(), Path(f"seen_stocks_{scan_key}.json"))
+                    print(f"  ✓ Cleared: {scan_name}")
+                print("Daily reset complete. All scans will treat stocks as new tomorrow.")
+                print(f"{'='*60}\n")
+                last_reset_date = now.date()
+                # Sleep past 15:30 to avoid re-triggering
+                time.sleep(60)
+                continue
+            
             if now.time() < trading_start or now.time() > trading_end:
                 next_start = next_trading_start(now)
                 sleep_seconds = (next_start - now).total_seconds()
