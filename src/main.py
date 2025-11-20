@@ -77,11 +77,19 @@ def main():
     daily_reset_time = datetime.time(15, 30)  # Clear seen stocks at 15:30
 
     def next_trading_start(after: datetime.datetime) -> datetime.datetime:
-        """Return next trading day start datetime in tz after given datetime."""
+        """Return next trading day start datetime in tz after given datetime.
+        
+        Skips weekends (Saturday=5, Sunday=6) and moves to next Monday.
+        """
         target_date = after.date()
         # If we're already past today's end, move to next day
         if after.time() > trading_end:
             target_date += datetime.timedelta(days=1)
+        
+        # Skip weekends: if Saturday (5) or Sunday (6), move to Monday
+        while target_date.weekday() >= 5:  # 5=Saturday, 6=Sunday
+            target_date += datetime.timedelta(days=1)
+        
         return datetime.datetime.combine(target_date, trading_start, tzinfo=tz)
 
     def next_slot(current: datetime.datetime) -> datetime.datetime:
@@ -187,6 +195,15 @@ def main():
 
         while True:
             now = datetime.datetime.now(tz)
+            
+            # Skip weekends (Saturday=5, Sunday=6)
+            if now.weekday() >= 5:
+                next_monday = next_trading_start(now)
+                sleep_seconds = (next_monday - now).total_seconds()
+                day_name = "Saturday" if now.weekday() == 5 else "Sunday"
+                print(f"Weekend ({day_name}). Market closed. Sleeping until Monday {next_monday.time()} ({int(sleep_seconds)}s / {int(sleep_seconds/3600)} hours)...")
+                time.sleep(sleep_seconds)
+                continue
             
             # Daily reset: Clear all seen stocks at 15:30 once per day
             if (now.time().hour == 15 and now.time().minute == 30 and 
