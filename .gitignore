@@ -1,0 +1,65 @@
+# Credentials and Secrets
+.env
+*.env
+.env.local
+.env.backup
+
+# Session and State Files
+cookies.json
+seen_stocks*.json
+
+# Test Files
+test_*.py
+chartink_login_page.html
+scan_page.html
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+ENV/
+env/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Selenium Drivers (auto-downloaded by Selenium Manager)
+drivers/
+*.exe
+
+# Logs
+*.log
+nohup.out
+
+# OS
+Thumbs.db
+.DS_Store
