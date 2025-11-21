@@ -39,7 +39,7 @@ def format_telegram_alert(stock: str, scan_url: str, scan_name: Optional[str] = 
 
     Args:
         stock: Stock symbol/name
-        scan_url: URL to the Chartink scan
+        scan_url: URL to the Chartink scan (not included in message)
         scan_name: Name/label for the scan (e.g., "EMA scan")
 
     Returns:
@@ -48,10 +48,9 @@ def format_telegram_alert(stock: str, scan_url: str, scan_name: Optional[str] = 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     scan_label = f" *[{scan_name}]*" if scan_name else ""
     
-    # Telegram Markdown formatting
+    # Telegram Markdown formatting (without scan URL)
     return (
         f"📈 *New Stock Listed*{scan_label}\n"
         f"💰 Stock: *{stock}*\n"
-        f"🔗 [View Scan]({scan_url})\n"
         f"⏰ Time: `{timestamp}`"
     )
