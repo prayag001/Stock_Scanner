@@ -1,8 +1,8 @@
 """Main entry point for the Stock Bot application.
 
 Runs the scan every 15 minutes between 09:15 and 15:15 India time.
-Sends immediate Discord notifications for new stocks (or all if ALWAYS_NOTIFY=true).
-Daily reset at 15:30 clears all seen stocks for fresh start next day.
+Sends immediate Discord and/or Telegram notifications for new stocks.
+Daily reset after 15:15 clears all seen stocks for fresh start next day.
 """
 import os
 import time
@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from chartink import ChartinkClient
 from notifier import format_stock_alert, send_discord
+from telegram_notifier import format_telegram_alert, send_telegram
 from storage import load_seen, save_seen
 
 
@@ -23,7 +24,16 @@ def main():
 
     email = os.getenv("CHARTINK_EMAIL")
     password = os.getenv("CHARTINK_PASSWORD")
-    webhook = os.getenv("DISCORD_WEBHOOK")
+    
+    # Discord configuration
+    discord_webhook = os.getenv("DISCORD_WEBHOOK")
+    enable_discord = os.getenv("ENABLE_DISCORD", "true").lower() in ("1", "true", "yes")
+    
+    # Telegram configuration
+    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    telegram_chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    enable_telegram = os.getenv("ENABLE_TELEGRAM", "false").lower() in ("1", "true", "yes")
+    
     always_notify = os.getenv("ALWAYS_NOTIFY", "false").lower() in ("1", "true", "yes")
     simulate = os.getenv("SIMULATE", "false").lower() in ("1", "true", "yes")
     simulation_runs = int(os.getenv("SIMULATION_RUNS", "3"))
@@ -45,10 +55,18 @@ def main():
     scan_name_3 = os.getenv("SCAN_NAME_3", "Scan 3")
     enable_scan_3 = os.getenv("ENABLE_SCAN_3", "true").lower() in ("1", "true", "yes")
 
-    if not all([email, password, webhook]):
-        raise RuntimeError(
-            "Missing env vars: CHARTINK_EMAIL, CHARTINK_PASSWORD, DISCORD_WEBHOOK"
-        )
+    # Validate required credentials
+    if not all([email, password]):
+        raise RuntimeError("Missing env vars: CHARTINK_EMAIL, CHARTINK_PASSWORD")
+    
+    if enable_discord and not discord_webhook:
+        raise RuntimeError("ENABLE_DISCORD=true but DISCORD_WEBHOOK not set")
+    
+    if enable_telegram and not all([telegram_token, telegram_chat_id]):
+        raise RuntimeError("ENABLE_TELEGRAM=true but TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set")
+    
+    if not enable_discord and not enable_telegram:
+        raise RuntimeError("Both Discord and Telegram are disabled. Enable at least one notification method.")
 
     # Build list of enabled scans
     scans = []
@@ -74,7 +92,6 @@ def main():
     tz = ZoneInfo("Asia/Kolkata")
     trading_start = datetime.time(9, 15)
     trading_end = datetime.time(15, 15)  # inclusive
-    daily_reset_time = datetime.time(15, 30)  # Clear seen stocks at 15:30
 
     def next_trading_start(after: datetime.datetime) -> datetime.datetime:
         """Return next trading day start datetime in tz after given datetime.
@@ -135,6 +152,17 @@ def main():
         
         return next_dt
 
+    # Helper function to send notifications to enabled platforms
+    def send_notifications(stock: str, scan_url: str, scan_name: str):
+        """Send stock alert to all enabled notification platforms."""
+        if enable_discord:
+            discord_msg = format_stock_alert(stock, scan_url, scan_name)
+            send_discord(discord_webhook, discord_msg)
+        
+        if enable_telegram:
+            telegram_msg = format_telegram_alert(stock, scan_url, scan_name)
+            send_telegram(telegram_token, telegram_chat_id, telegram_msg)
+
     with ChartinkClient(email=email, password=password, driver_path=driver_path,
                         headless=headless, cookies_path=cookies_path) as client:
         print("Logging into Chartink...")
@@ -151,6 +179,13 @@ def main():
                 seen_stocks[scan["name"]] = load_seen(seen_path)
             else:
                 seen_stocks[scan["name"]] = set()
+        
+        platforms = []
+        if enable_discord:
+            platforms.append("Discord")
+        if enable_telegram:
+            platforms.append("Telegram")
+        print(f"Notification platforms enabled: {', '.join(platforms)}")
         print(f"Loaded seen stocks: {', '.join([f'{name}={len(s)}' for name, s in seen_stocks.items()])}")
 
         # Track if reset was done today
@@ -179,10 +214,9 @@ def main():
                         else:
                             print(f"  No new stocks for {scan_name}.")
                     for stock in target_stocks:
-                        msg = format_stock_alert(stock, scan_url, scan_name)
-                        send_discord(webhook, msg)
+                        send_notifications(stock, scan_url, scan_name)
                     if target_stocks:
-                        print(f"  Discord notifications dispatched for {scan_name}.")
+                        print(f"  Notifications dispatched to {', '.join(platforms)} for {scan_name}.")
                     seen |= current_set
                     seen_stocks[scan_name] = seen
                     scan_key = scan_name.replace(" ", "_").lower()
@@ -248,10 +282,9 @@ def main():
                         print(f"  [{scan_name}] No new stocks this slot.")
 
                 for stock in target_stocks:
-                    msg = format_stock_alert(stock, scan_url, scan_name)
-                    send_discord(webhook, msg)
+                    send_notifications(stock, scan_url, scan_name)
                 if target_stocks:
-                    print(f"  [{scan_name}] Discord notifications dispatched.")
+                    print(f"  [{scan_name}] Notifications dispatched to {', '.join(platforms)}.")
 
                 # Update seen repository for this scan
                 seen |= current_set

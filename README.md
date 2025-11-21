@@ -1,14 +1,17 @@
 # Stock Bot
 
-Automated stock screening bot that monitors [Chartink.com](https://chartink.com) for Indian stocks matching custom criteria and sends real-time Discord alerts.
+Automated stock screening bot that monitors [Chartink.com](https://chartink.com) for Indian stocks matching custom criteria and sends real-time notifications via Discord and/or Telegram.
 
 ## Features
 
 - 🔍 **Automated Scanning** - Runs custom Chartink scans on a schedule
-- 🔔 **Discord Notifications** - Real-time alerts for new stocks
+- 🔔 **Multi-Platform Notifications** - Discord and/or Telegram alerts (toggle either or both)
 - 💾 **Persistent Tracking** - Remembers seen stocks to avoid duplicates
 - 🌐 **Browser Automation** - Selenium-based web scraping
 - ⚡ **Context Manager Support** - Automatic resource cleanup
+- 📅 **Weekend Skip** - Automatically pauses on Saturdays and Sundays
+- 🔄 **Daily Reset** - Clears seen stocks after market close
+- 🎯 **Multi-Scan Support** - Run up to 3 independent scans simultaneously
 
 ## Setup
 
@@ -35,9 +38,26 @@ pip install -r requirements.txt
 ```env
 CHARTINK_EMAIL=your_email@example.com
 CHARTINK_PASSWORD=your_password
-SCAN_URL=https://chartink.com/screener/your-scan-url
+
+# Notification Platform Toggles (enable at least one)
+ENABLE_DISCORD=true
+ENABLE_TELEGRAM=false
+
+# Discord Configuration
 DISCORD_WEBHOOK=https://discord.com/api/webhooks/your-webhook-url
-REFRESH_MINUTES=15
+PING_HERE=true
+
+# Telegram Configuration (optional)
+TELEGRAM_BOT_TOKEN=123456789:YOUR_BOT_TOKEN_HERE
+TELEGRAM_CHAT_ID=YOUR_CHAT_ID_HERE
+
+# Scan Configuration
+SCAN_URL_1=https://chartink.com/screener/your-scan-url
+SCAN_NAME_1=EMA scan
+ENABLE_SCAN_1=true
+
+HEADLESS=true
+ALWAYS_NOTIFY=false
 ```
 
 ### Getting Your Discord Webhook
@@ -45,6 +65,16 @@ REFRESH_MINUTES=15
 1. Go to your Discord server settings
 2. Navigate to **Integrations** → **Webhooks**
 3. Click **New Webhook** or **Copy Webhook URL**
+
+### Getting Your Telegram Bot Credentials
+
+1. Open Telegram and search for **@BotFather**
+2. Send `/newbot` and follow the prompts
+3. Copy the **bot token** (e.g., `123456789:ABCdef...`)
+4. For your **chat ID**:
+   - Search for **@userinfobot** on Telegram
+   - Start a chat - it will show your Chat ID
+5. Start a chat with your bot (send `/start`) before running the script
 
 ## Usage
 
@@ -99,16 +129,21 @@ kill <PID>
 ```
 Stock_Bot/
 ├── src/
-│   ├── __init__.py        # Package initialization
-│   ├── main.py            # Entry point and orchestration
-│   ├── chartink.py        # Web scraping client
-│   ├── notifier.py        # Discord integration
-│   ├── storage.py         # Persistent storage
-│   └── chartink_selectors.py # CSS/XPath selectors
+│   ├── __init__.py             # Package initialization
+│   ├── main.py                 # Entry point and orchestration
+│   ├── chartink.py             # Web scraping client
+│   ├── notifier.py             # Discord integration
+│   ├── telegram_notifier.py    # Telegram integration
+│   ├── storage.py              # Persistent storage
+│   └── chartink_selectors.py  # CSS/XPath selectors
 ├── drivers/
-│   └── msedgedriver.exe   # Edge WebDriver
-├── .env                   # Environment variables (create this)
-├── requirements.txt       # Python dependencies
+│   └── msedgedriver.exe        # Edge WebDriver (auto-managed)
+├── .env                        # Environment variables (create this)
+├── .env.example                # Environment template
+├── requirements.txt            # Python dependencies
+├── run_bot.sh                  # Linux/Mac launcher
+├── run_bot.bat                 # Windows launcher
+├── deploy.sh                   # Deployment script for cloud VPS
 └── README.md
 ```
 
@@ -116,28 +151,34 @@ Stock_Bot/
 
 ### Environment Variables
 
-Required:
+**Required:**
 - `CHARTINK_EMAIL` — Chartink account email
 - `CHARTINK_PASSWORD` — Chartink account password
-- `SCAN_URL` — Full Chartink scan URL
-- `DISCORD_WEBHOOK` — Discord webhook URL
 
-Scheduling and behavior:
-- `HEADLESS=true` — run browser hidden (default true)
-- `COOKIES_PATH=cookies.json` — file to persist/reuse login session
-- `ALWAYS_NOTIFY=false` — when true, send all stocks each run; when false, only new ones
+**Notification Platforms (enable at least one):**
+- `ENABLE_DISCORD=true` — Enable Discord notifications
+- `ENABLE_TELEGRAM=false` — Enable Telegram notifications
+- `DISCORD_WEBHOOK` — Discord webhook URL (required if Discord enabled)
+- `TELEGRAM_BOT_TOKEN` — Telegram bot token from @BotFather (required if Telegram enabled)
+- `TELEGRAM_CHAT_ID` — Your Telegram chat ID (required if Telegram enabled)
 
-Audible alerts (optional):
-- `PING_HERE=true` — prepend @here to trigger sounds for online members
-- `MENTION_ROLE_ID=<roleId>` — ping a role (requires permission)
-- `MENTION_USER_ID=<userId>` — ping a specific user
+**Scan Configuration:**
+- `SCAN_URL_1` — First Chartink scan URL
+- `SCAN_NAME_1=EMA scan` — Label for first scan
+- `ENABLE_SCAN_1=true` — Enable/disable first scan
+- `SCAN_URL_2`, `SCAN_NAME_2`, `ENABLE_SCAN_2` — Second scan (optional)
+- `SCAN_URL_3`, `SCAN_NAME_3`, `ENABLE_SCAN_3` — Third scan (optional)
 
-Simulation (for quick testing outside market hours):
-- `SIMULATE=false` — when true, bypasses market window and runs compressed loops
-- `SIMULATION_RUNS=3` — number of simulation scans
-- `SIMULATION_INTERVAL_SECONDS=60` — seconds between simulation scans
+**Behavior:**
+- `HEADLESS=true` — Run browser hidden (default true)
+- `COOKIES_PATH=cookies.json` — File to persist/reuse login session
+- `ALWAYS_NOTIFY=false` — When true, send all stocks each run; when false, only new ones
+- `PING_HERE=true` — Prepend @here to Discord messages (triggers sounds)
 
-Note: The bot uses fixed 15‑minute slots during market hours; `REFRESH_MINUTES` is not used in scheduled mode.
+**Simulation Mode (for testing outside market hours):**
+- `SIMULATE=false` — When true, bypasses market window and runs compressed loops
+- `SIMULATION_RUNS=3` — Number of simulation scans
+- `SIMULATION_INTERVAL_SECONDS=60` — Seconds between simulation scans
 
 ## Headless & Session Reuse
 
@@ -145,10 +186,23 @@ Note: The bot uses fixed 15‑minute slots during market hours; `REFRESH_MINUTES
 - On start it attempts to load cookies and go straight to the scan.
 - If cookies are invalid/expired, it performs a headless login once and re‑saves cookies automatically.
 
-## Discord Audible Alerts
+## Notification Platforms
 
-- Webhook messages make sounds only if the channel/user’s notification settings allow it or if the message includes a mention.
-- Use `PING_HERE=true` or set `MENTION_ROLE_ID`/`MENTION_USER_ID` to trigger sounds (subject to user/server settings).
+### Discord
+- Webhook messages make sounds only if the channel/user's notification settings allow it or if the message includes a mention.
+- Use `PING_HERE=true` to trigger sounds for online members (subject to user/server settings).
+- Toggle: Set `ENABLE_DISCORD=false` to disable Discord notifications.
+
+### Telegram
+- Messages are sent via Telegram Bot API with Markdown formatting.
+- Supports personal chats, groups, and channels.
+- Toggle: Set `ENABLE_TELEGRAM=true` to enable Telegram notifications.
+- **Note:** You must start a chat with your bot (send `/start`) before it can send you messages.
+
+### Dual-Platform Mode
+- You can enable **both** Discord and Telegram simultaneously.
+- Notifications will be sent to all enabled platforms.
+- To use only one platform, set the other to `false` in `.env`.
 
 ## Code Quality
 
