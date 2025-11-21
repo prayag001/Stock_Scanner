@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 from chartink import ChartinkClient
 from notifier import format_stock_alert, send_discord
-from telegram_notifier import format_telegram_alert, send_telegram
+from telegram_notifier import format_telegram_alert, send_telegram, format_telegram_batch_alert
 from storage import load_seen, save_seen
 
 
@@ -154,13 +154,15 @@ def main():
 
     # Helper function to send notifications to enabled platforms
     def send_notifications(stock: str, scan_url: str, scan_name: str):
-        """Send stock alert to all enabled notification platforms."""
+        """Send stock alert to Discord (individual stock notifications)."""
         if enable_discord:
             discord_msg = format_stock_alert(stock, scan_url, scan_name)
             send_discord(discord_webhook, discord_msg)
-        
-        if enable_telegram:
-            telegram_msg = format_telegram_alert(stock, scan_url, scan_name)
+    
+    def send_telegram_batch(stocks: list, scan_url: str, scan_name: str):
+        """Send batch stock alert to Telegram (one message per scan)."""
+        if enable_telegram and stocks:
+            telegram_msg = format_telegram_batch_alert(stocks, scan_url, scan_name)
             send_telegram(telegram_token, telegram_chat_id, telegram_msg)
 
     with ChartinkClient(email=email, password=password, driver_path=driver_path,
@@ -213,10 +215,22 @@ def main():
                             print(f"  New stocks detected: {target_stocks}")
                         else:
                             print(f"  No new stocks for {scan_name}.")
+                    
+                    # Send Discord notifications (one per stock)
                     for stock in target_stocks:
                         send_notifications(stock, scan_url, scan_name)
+                    
+                    # Send Telegram notification (one per scan with all stocks)
+                    send_telegram_batch(target_stocks, scan_url, scan_name)
+                    
                     if target_stocks:
-                        print(f"  Notifications dispatched to {', '.join(platforms)} for {scan_name}.")
+                        notification_summary = []
+                        if enable_discord:
+                            notification_summary.append(f"Discord ({len(target_stocks)} messages)")
+                        if enable_telegram:
+                            notification_summary.append(f"Telegram (1 batch message)")
+                        print(f"  Notifications dispatched: {', '.join(notification_summary)} for {scan_name}.")
+                    
                     seen |= current_set
                     seen_stocks[scan_name] = seen
                     scan_key = scan_name.replace(" ", "_").lower()
@@ -281,10 +295,20 @@ def main():
                     else:
                         print(f"  [{scan_name}] No new stocks this slot.")
 
+                # Send Discord notifications (one per stock)
                 for stock in target_stocks:
                     send_notifications(stock, scan_url, scan_name)
+                
+                # Send Telegram notification (one per scan with all stocks)
+                send_telegram_batch(target_stocks, scan_url, scan_name)
+                
                 if target_stocks:
-                    print(f"  [{scan_name}] Notifications dispatched to {', '.join(platforms)}.")
+                    notification_summary = []
+                    if enable_discord:
+                        notification_summary.append(f"Discord ({len(target_stocks)} messages)")
+                    if enable_telegram:
+                        notification_summary.append(f"Telegram (1 batch message)")
+                    print(f"  [{scan_name}] Notifications dispatched: {', '.join(notification_summary)}.")
 
                 # Update seen repository for this scan
                 seen |= current_set

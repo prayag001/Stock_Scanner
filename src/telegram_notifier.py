@@ -1,7 +1,7 @@
 """Telegram notification module for stock alerts."""
 import datetime
 import os
-from typing import Optional
+from typing import List, Optional
 import requests
 
 
@@ -35,7 +35,7 @@ def send_telegram(bot_token: str, chat_id: str, message: str, parse_mode: str = 
 
 
 def format_telegram_alert(stock: str, scan_url: str, scan_name: Optional[str] = None) -> str:
-    """Format a stock alert message for Telegram.
+    """Format a stock alert message for Telegram (single stock - for Discord compatibility).
 
     Args:
         stock: Stock symbol/name
@@ -53,4 +53,30 @@ def format_telegram_alert(stock: str, scan_url: str, scan_name: Optional[str] = 
         f"📈 *New Stock Listed*{scan_label}\n"
         f"💰 Stock: *{stock}*\n"
         f"⏰ Time: `{timestamp}`"
+    )
+
+
+def format_telegram_batch_alert(stocks: List[str], scan_url: str, scan_name: Optional[str] = None) -> str:
+    """Format a batch stock alert message for Telegram (multiple stocks in one message).
+
+    Args:
+        stocks: List of stock symbols/names
+        scan_url: URL to the Chartink scan (not included in message)
+        scan_name: Name/label for the scan (e.g., "EMA scan")
+
+    Returns:
+        Formatted alert message string with Markdown formatting
+    """
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    scan_label = f"*[{scan_name}]*" if scan_name else "Scan"
+    stock_count = len(stocks)
+    
+    # Build stock list with bullet points
+    stock_list = "\n".join([f"  • *{stock}*" for stock in stocks])
+    
+    return (
+        f"📈 *New Stocks Listed* - {scan_label}\n"
+        f"📊 Count: `{stock_count}` stock{'s' if stock_count != 1 else ''}\n"
+        f"⏰ Time: `{timestamp}`\n\n"
+        f"💰 *Stocks:*\n{stock_list}"
     )
