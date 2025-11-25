@@ -2,7 +2,7 @@
 import json
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -16,6 +16,11 @@ from chartink_selectors import (
     LOGIN_EMAIL_INPUT, LOGIN_PASSWORD_INPUT, LOGIN_SUBMIT_BUTTON,
     RUN_SCAN_BUTTON_XPATH
 )
+
+
+class ChartinkMaintenanceError(Exception):
+    """Raised when Chartink scanner is under maintenance."""
+    pass
 
 class ChartinkClient:
     """Selenium-based client for automating Chartink stock screening."""
@@ -190,6 +195,9 @@ class ChartinkClient:
         html = self.driver.page_source
         soup = BeautifulSoup(html, "html.parser")
         
+        # Check for maintenance message
+        self._check_for_maintenance(soup)
+        
         # Extract stock symbols from URL parameters in links
         stocks = set()
         import re
@@ -203,18 +211,79 @@ class ChartinkClient:
         
         stock_list = sorted(list(stocks))
         return stock_list
+    
+    def _check_for_maintenance(self, soup: Optional[BeautifulSoup] = None) -> bool:
+        """Check if Chartink is showing a maintenance message.
+        
+        Args:
+            soup: Optional BeautifulSoup object of page. If None, parses current page.
+            
+        Returns:
+            True if maintenance detected
+            
+            Raises:
+            ChartinkMaintenanceError: If maintenance message is detected
+        """
+        if soup is None:
+            html = self.driver.page_source
+            soup = BeautifulSoup(html, "html.parser")
+        
+        # Check for maintenance indicators
+        page_text = soup.get_text().lower()
+        maintenance_keywords = [
+            "under maintenance",
+            "scanner under maintenance",
+            "please re-try",
+            "please retry",
+            "service unavailable",
+            "temporarily unavailable",
+            "server is busy",
+            "too many requests"
+        ]
+        
+        for keyword in maintenance_keywords:
+            if keyword in page_text:
+                # Try to extract the full message
+                for element in soup.find_all(['div', 'p', 'span', 'h1', 'h2', 'h3']):
+                    text = element.get_text(strip=True)
+                    if keyword in text.lower():
+                        raise ChartinkMaintenanceError(f"Chartink: {text}")
+                raise ChartinkMaintenanceError(f"Chartink scanner is under maintenance. Please retry later.")
+        
+        return False
 
-    def run_scan_and_fetch(self, scan_url: str) -> List[str]:
+    def run_scan_and_fetch(self, scan_url: str, max_retries: int = 3, retry_delay: int = 60) -> Tuple[List[str], bool]:
         """Execute a complete scan workflow: open and fetch results.
 
         Args:
             scan_url: Full URL of the Chartink scan
+            max_retries: Maximum number of retries on maintenance (default: 3)
+            retry_delay: Seconds to wait between retries (default: 60)
 
         Returns:
-            List of stock symbols matching the scan criteria
+            Tuple of (List of stock symbols, maintenance_encountered bool)
+            
+        Note:
+            If maintenance is encountered and all retries fail, returns empty list
+            with maintenance_encountered=True instead of raising exception.
         """
-        self.open_scan(scan_url)
-        # Page auto-loads scan results, no button click needed
-        # Small sleep to ensure AJAX content is loaded
-        time.sleep(1)
-        return self.get_stocks()
+        for attempt in range(max_retries):
+            try:
+                self.open_scan(scan_url)
+                # Page auto-loads scan results, no button click needed
+                # Small sleep to ensure AJAX content is loaded
+                time.sleep(1)
+                stocks = self.get_stocks()
+                return stocks, False  # Success, no maintenance
+                
+            except ChartinkMaintenanceError as e:
+                if attempt < max_retries - 1:
+                    print(f"  ⚠️  {e}")
+                    print(f"  ⏳ Waiting {retry_delay}s before retry ({attempt + 1}/{max_retries})...")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"  ❌ {e}")
+                    print(f"  ❌ Max retries ({max_retries}) reached. Skipping this scan slot.")
+                    return [], True  # Return empty with maintenance flag
+                    
+        return [], True  # Should not reach here, but safety fallback

@@ -202,7 +202,12 @@ def main():
                     scan_name = scan["name"]
                     scan_url = scan["url"]
                     print(f"  Running {scan_name}...")
-                    stocks = client.run_scan_and_fetch(scan_url)
+                    stocks, maintenance = client.run_scan_and_fetch(scan_url)
+                    
+                    if maintenance:
+                        print(f"  ⚠️  [{scan_name}] Skipped due to maintenance. Will retry next slot.")
+                        continue
+                    
                     current_set = set(stocks)
                     seen = seen_stocks[scan_name]
                     new_stocks = sorted(list(current_set - seen))
@@ -280,7 +285,12 @@ def main():
                 scan_name = scan["name"]
                 scan_url = scan["url"]
                 print(f"  [{scan_name}] Scanning...")
-                stocks = client.run_scan_and_fetch(scan_url)
+                stocks, maintenance = client.run_scan_and_fetch(scan_url)
+                
+                if maintenance:
+                    print(f"  ⚠️  [{scan_name}] Skipped due to maintenance. Will retry next slot.")
+                    continue
+                
                 current_set = set(stocks)
                 seen = seen_stocks[scan_name]
                 new_stocks = sorted(list(current_set - seen))
