@@ -221,7 +221,7 @@ class ChartinkClient:
         Returns:
             True if maintenance detected
             
-            Raises:
+        Raises:
             ChartinkMaintenanceError: If maintenance message is detected
         """
         if soup is None:
@@ -278,12 +278,12 @@ class ChartinkClient:
                 
             except ChartinkMaintenanceError as e:
                 if attempt < max_retries - 1:
-                    print(f"  ⚠️  {e}")
-                    print(f"  ⏳ Waiting {retry_delay}s before retry ({attempt + 1}/{max_retries})...")
+                    print(f"  \u26a0\ufe0f  {e}")
+                    print(f"  \u23f3 Waiting {retry_delay}s before retry ({attempt + 1}/{max_retries})...")
                     time.sleep(retry_delay)
                 else:
-                    print(f"  ❌ {e}")
-                    print(f"  ❌ Max retries ({max_retries}) reached. Skipping this scan slot.")
+                    print(f"  \u274c {e}")
+                    print(f"  \u274c Max retries ({max_retries}) reached. Skipping this scan slot.")
                     return [], True  # Return empty with maintenance flag
                     
         return [], True  # Should not reach here, but safety fallback
