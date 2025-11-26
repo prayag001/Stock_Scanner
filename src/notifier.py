@@ -72,3 +72,29 @@ def format_stock_alert(stock: str, _scan_url: str, scan_name: str = None) -> str
         f"📈 New Stock Listed{scan_label}: **{stock}**\n"
         f"⏰ {timestamp}"
     )
+
+
+def format_discord_batch_alert(stocks: list, _scan_url: str, scan_name: str = None) -> str:
+    """Format a batch stock alert message for Discord (multiple stocks in one message).
+
+    Args:
+        stocks: List of stock symbols/names
+        _scan_url: URL of the Chartink scan (not used in message)
+        scan_name: Name/label for the scan (e.g., "EMA scan", "BB Scalping Scan")
+
+    Returns:
+        Formatted alert message string
+    """
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    scan_label = f"[{scan_name}]" if scan_name else "Scan"
+    stock_count = len(stocks)
+    
+    # Build stock list with bullet points
+    stock_list = "\n".join([f"  • **{stock}**" for stock in stocks])
+    
+    return (
+        f"📈 **New Stocks Listed** - {scan_label}\n"
+        f"📊 Count: `{stock_count}` stock{'s' if stock_count != 1 else ''}\n"
+        f"⏰ {timestamp}\n\n"
+        f"💰 **Stocks:**\n{stock_list}"
+    )
