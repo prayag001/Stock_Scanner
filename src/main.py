@@ -1,8 +1,8 @@
 """Main entry point for the Stock Bot application.
 
-Runs the scan every 15 minutes between 09:15 and 15:15 India time.
+Runs the scan every 15 minutes between 09:20 and 15:20 India time.
 Sends immediate Discord and/or Telegram notifications for new stocks.
-Daily reset after 15:15 clears all seen stocks for fresh start next day.
+Daily reset after 15:20 clears all seen stocks for fresh start next day.
 """
 import os
 import time
@@ -90,8 +90,8 @@ def main():
 
     # Scheduling parameters (India time)
     tz = ZoneInfo("Asia/Kolkata")
-    trading_start = datetime.time(9, 15)
-    trading_end = datetime.time(15, 15)  # inclusive
+    trading_start = datetime.time(9, 20)
+    trading_end = datetime.time(15, 20)  # inclusive
 
     def next_trading_start(after: datetime.datetime) -> datetime.datetime:
         """Return next trading day start datetime in tz after given datetime.
@@ -117,19 +117,19 @@ def main():
         # If after end -> next day start
         if current.time() > trading_end:
             return next_trading_start(current)
-        # Inside window: align to exact slot boundaries (09:15, 09:30, 09:45, 10:00, ...)
-        # Slots: minute must be 0, 15, 30, or 45
+        # Inside window: align to exact slot boundaries (09:20, 09:35, 09:50, 10:05, ...)
+        # Slots: minute must be 5, 20, 35, or 50
         hour = current.hour
         minute = current.minute
         # Calculate next slot minute
-        if minute < 15:
-            next_minute = 15
-        elif minute < 30:
-            next_minute = 30
-        elif minute < 45:
-            next_minute = 45
-        else:  # minute >= 45
-            next_minute = 0
+        if minute < 20:
+            next_minute = 20
+        elif minute < 35:
+            next_minute = 35
+        elif minute < 50:
+            next_minute = 50
+        else:  # minute >= 50
+            next_minute = 5
             hour += 1
         
         next_time = datetime.time(hour, next_minute)
@@ -140,9 +140,9 @@ def main():
         next_dt = datetime.datetime.combine(current.date(), next_time, tzinfo=tz)
         # If we're already past this slot (e.g., current is 09:30:05), move to next
         if next_dt <= current:
-            if next_minute == 45:
+            if next_minute == 50:
                 hour += 1
-                next_minute = 0
+                next_minute = 5
             else:
                 next_minute += 15
             next_time = datetime.time(hour, next_minute)
@@ -265,7 +265,7 @@ def main():
             
             # Daily reset check moved below - happens AFTER last scan at 15:15
             
-            if now.time() < trading_start or (now.time().hour == 15 and now.time().minute > 15) or now.time().hour > 15:
+            if now.time() < trading_start or now.time() > trading_end:
                 next_start = next_trading_start(now)
                 sleep_seconds = (next_start - now).total_seconds()
                 print(f"Outside trading window ({now.time()}). Sleeping until {next_start.time()} ({int(sleep_seconds)}s)...")
@@ -273,8 +273,8 @@ def main():
                 continue
 
             # Align execution to slot boundaries: if not exactly on a slot, wait until next slot
-            # Slots: 9:15, 9:30, 9:45, ... 15:15
-            slot_minutes = {15, 30, 45, 0}
+            # Slots: 9:20, 9:35, 9:50, ... 15:20
+            slot_minutes = {5, 20, 35, 50}
             if now.minute not in slot_minutes or now.second != 0:
                 target = next_slot(now)
                 sleep_seconds = (target - now).total_seconds()
